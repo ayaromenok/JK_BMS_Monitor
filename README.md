@@ -56,58 +56,63 @@ pip install bleak
 # Scan for nearby BMS devices
 python jk_bms_cli.py scan
 
-# Connect to a BMS device
+# Test the connection (connect, report device identity, disconnect)
 python jk_bms_cli.py connect AA:BB:CC:DD:EE:FF
 
 # Read device information
-python jk_bms_cli.py read info
+python jk_bms_cli.py read AA:BB:CC:DD:EE:FF info
 
 # Read real-time status
-python jk_bms_cli.py read status
+python jk_bms_cli.py read AA:BB:CC:DD:EE:FF status
 
 # Read detailed logs
-python jk_bms_cli.py read logs
+python jk_bms_cli.py read AA:BB:CC:DD:EE:FF logs
 
 # Read all data
-python jk_bms_cli.py read all
+python jk_bms_cli.py read AA:BB:CC:DD:EE:FF all
 
 # Enable balancing
-python jk_bms_cli.py write balance on
+python jk_bms_cli.py write AA:BB:CC:DD:EE:FF balance on
 
 # Enable charging
-python jk_bms_cli.py write charge on
+python jk_bms_cli.py write AA:BB:CC:DD:EE:FF charge on
 
 # Enable discharging
-python jk_bms_cli.py write discharge on
+python jk_bms_cli.py write AA:BB:CC:DD:EE:FF discharge on
 
-# Start continuous monitoring (3 second intervals)
-python jk_bms_cli.py monitor
+# Start continuous monitoring (3 second intervals, 15s duration)
+python jk_bms_cli.py monitor AA:BB:CC:DD:EE:FF
 
-# Start monitoring with custom interval (5 seconds)
-python jk_bms_cli.py monitor --interval 5000
+# Start monitoring with custom interval (5 seconds) and duration (30s)
+python jk_bms_cli.py monitor AA:BB:CC:DD:EE:FF --interval 5000 --duration 30
 
 # Send raw hex data
-python jk_bms_cli.py raw 55AAEB90030000
+python jk_bms_cli.py raw AA:BB:CC:DD:EE:FF 55AAEB90030000
 
 # Show protocol information
 python jk_bms_cli.py info
-
-# Disconnect
-python jk_bms_cli.py disconnect
 ```
+
+> **Note:** Each command that talks to a device is self-contained — it connects,
+> performs the operation, and disconnects within a single run. A BLE connection
+> cannot persist across separate CLI invocations, so there is no separate
+> `connect`/`disconnect` session to manage; just pass the device address to the
+> command you want to run.
 
 #### Command Reference
 
 | Command | Description | Arguments |
 |---------|-------------|-----------|
 | `scan` | Scan for BMS devices | `--timeout` - Scan duration (default: 5s) |
-| `connect` | Connect to BMS device | `address` - MAC address or UUID |
-| `read` | Read data from BMS | `info`, `status`, `realtime`, `logs`, `extended`, `all` |
-| `write` | Write configuration | `balance`, `charge`, `discharge`, `protection`, `calibration` |
-| `monitor` | Continuous monitoring | `--interval` - Update interval in ms |
-| `raw` | Send raw hex data | `data` - Hex string |
-| `disconnect` | Disconnect device | None |
+| `connect` | Test connection to BMS device | `address` - MAC address |
+| `read` | Read data from BMS | `address`, then `info`/`status`/`realtime`/`logs`/`extended`/`all`, `--wait` |
+| `write` | Write configuration | `address`, then `balance`/`charge`/`discharge`/`protection`/`calibration`, `value` |
+| `monitor` | Continuous monitoring | `address`, `--interval` (ms), `--duration` (s) |
+| `raw` | Send raw hex data | `address`, `data` - Hex string |
 | `info` | Show protocol info | None |
+
+All device commands also accept `--attempts` (default 5) and `--retry-wait` (default 8s)
+to control connection retry behaviour.
 
 ### Protocol Details
 
@@ -182,8 +187,14 @@ sudo python jk_bms_cli.py scan
 
 1. Ensure the BMS device is powered on
 2. Make sure the device is in pairing mode
-3. Check that Bluetooth is enabled
+3. Check that Bluetooth is enabled: `sudo hciconfig hci0` (should be `UP RUNNING`)
+   and `sudo rfkill list` (Bluetooth should not be `Soft blocked: yes`)
 4. Try increasing scan timeout: `python jk_bms_cli.py scan --timeout 10`
+
+The JK BMS needs a few seconds to reset its BLE stack after a session, so a single
+connect attempt can time out. The CLI retries automatically (5 attempts by default,
+with a growing backoff). If connections keep failing, wait ~20-30s and try again,
+or increase attempts: `python jk_bms_cli.py read <addr> status --attempts 8`
 
 #### Data Not Showing
 
